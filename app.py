@@ -16,7 +16,7 @@ def load_data(file_path):
         st.error(f"An error occurred while loading the data: {e}")
         st.stop()
 
-df = load_data(r"C:\Users\gunel\Downloads\satis_streamlitapp\p\cleaned_data (2).csv")
+df = load_data("cleaned_data.csv")
 
 st.title("🥔 Chip Sales Analytics Dashboard")
 st.sidebar.title("Dashboard Filters")
