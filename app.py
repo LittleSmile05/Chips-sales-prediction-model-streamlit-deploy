@@ -2,15 +2,20 @@ import pandas as pd
 import streamlit as st
 import plotly.express as px
 import plotly.graph_objs as go
-import seaborn as sns
-import matplotlib.pyplot as plt
+import joblib
+import numpy as np
+from sklearn.preprocessing import StandardScaler, OneHotEncoder
+from sklearn.compose import ColumnTransformer
+from sklearn.pipeline import Pipeline
+from sklearn.impute import SimpleImputer
+
 st.set_page_config(page_title="Chip Sales Dashboard", layout="wide")
+
 @st.cache_data
 def load_data(file_path):
     try:
         df = pd.read_csv(file_path, encoding='utf-8')
         df['Tarix'] = pd.to_datetime(df['Tarix'])
-        
         return df
     except Exception as e:
         st.error(f"An error occurred while loading the data: {e}")
@@ -37,11 +42,12 @@ with col2:
 with col3:
     st.metric("Unique Stores", filtered_df['Mağaza'].nunique())
 
-tab1, tab2, tab3, tab4 = st.tabs([
+tab1, tab2, tab3, tab4, tab5 = st.tabs([
     "Chip Brands Analysis", 
     "Sales Trends", 
     "Store Performance", 
-    "Product Details"
+    "Product Details",
+    "Sales Prediction"
 ])
 
 with tab1:
@@ -140,6 +146,7 @@ with tab4:
                                   title='Sales by Chip Weight',
                                   labels={'weight': 'Chip Weight (g)', 'Ümumi satış': 'Total Sales (₼)'})
         st.plotly_chart(fig_weight_sales)
+
 st.sidebar.header("Data Insights")
 st.sidebar.write("Missing Values:")
 st.sidebar.write(df.isnull().sum())
@@ -148,33 +155,12 @@ if st.sidebar.checkbox("View Raw Data"):
     st.subheader("Raw Data")
     st.dataframe(filtered_df)
 
-import pandas as pd
-import streamlit as st
-import plotly.express as px
-import plotly.graph_objs as go
-import joblib
-import numpy as np
-from sklearn.preprocessing import StandardScaler, OneHotEncoder
-from sklearn.compose import ColumnTransformer
-from sklearn.pipeline import Pipeline
-from sklearn.impute import SimpleImputer
+best_model = joblib.load("best_model.pkl")
 
-# Load the existing code from the previous script
-df = load_data(r"C:\Users\gunel\Downloads\satis_streamlitapp\p\cleaned_data (2).csv")
-
-# Load the best saved model
-try:
-    best_model = joblib.load("best_model.pkl")
-except Exception as e:
-    st.error(f"Error loading the model: {e}")
-    st.stop()
-
-# Preprocessing function (similar to what was used during model training)
 def create_preprocessor(df):
     numeric_features = df.select_dtypes(include=['int64', 'float64']).columns.tolist()
     categorical_features = df.select_dtypes(exclude=['int64', 'float64']).columns.tolist()
     
-    # Remove 'Ümumi satış' from features if present
     if 'Ümumi satış' in numeric_features:
         numeric_features.remove('Ümumi satış')
     
@@ -196,66 +182,38 @@ def create_preprocessor(df):
     
     return preprocessor, numeric_features, categorical_features
 
-# Create preprocessor
 preprocessor, numeric_features, categorical_features = create_preprocessor(df.drop('Ümumi satış', axis=1))
-
-# Fit the preprocessor on the entire dataset
 X = df.drop('Ümumi satış', axis=1)
 preprocessor.fit(X)
 
-# Add a new tab for Sales Prediction
-tab1, tab2, tab3, tab4, tab5 = st.tabs([
-    "Chip Brands Analysis", 
-    "Sales Trends", 
-    "Store Performance", 
-    "Product Details",
-    "Sales Prediction" # New tab
-])
-
-# ... (keep all previous tabs as they were)
-
-# New tab for Sales Prediction
 with tab5:
     st.header("Chip Sales Prediction")
     
-    # Create input fields dynamically based on available features
-    st.subheader("Enter Chip Sale Details for Prediction")
-    
-    # Prepare input containers
     input_data = {}
     
-    # Numeric features
     st.write("Numeric Features:")
     numeric_cols = st.columns(len(numeric_features))
     for i, feature in enumerate(numeric_features):
         with numeric_cols[i]:
             input_data[feature] = st.number_input(feature, min_value=0.0, step=0.1)
     
-    # Categorical features
     st.write("Categorical Features:")
     cat_cols = st.columns(len(categorical_features))
     for i, feature in enumerate(categorical_features):
         with cat_cols[i]:
-            # Get unique values for each categorical feature
             unique_values = df[feature].unique()
             input_data[feature] = st.selectbox(feature, unique_values)
     
-    # Prediction button
     if st.button("Predict Sales"):
-        # Convert input to DataFrame
         input_df = pd.DataFrame([input_data])
         
         try:
-            # Preprocess the input
             input_transformed = preprocessor.transform(input_df)
             
-            # Make prediction
             prediction = best_model.predict(input_transformed)
             
-            # Display prediction
             st.success(f"Predicted Sales: ₼ {prediction[0]:.2f}")
             
-            # Confidence visualization
             st.write("Prediction Confidence Visualization")
             fig = go.Figure(go.Indicator(
                 mode = "gauge+number",
@@ -275,5 +233,3 @@ with tab5:
             
         except Exception as e:
             st.error(f"Prediction error: {e}")
-
-# Keep the rest of the original dashboard code
